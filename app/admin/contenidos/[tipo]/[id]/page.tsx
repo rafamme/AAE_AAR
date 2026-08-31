@@ -8,10 +8,13 @@ const allowed=new Set(Object.keys(labels));
 export default async function ContentEditor({params,searchParams}:{params:Promise<{tipo:string;id:string}>;searchParams:Promise<{mensaje?:string}>}){
   const {tipo,id}=await params;if(!allowed.has(tipo)) notFound();
   const {mensaje}=await searchParams;const supabase=await createClient();
-  const [{data:locations},{data:monuments}]=await Promise.all([
+  const {data:{user}}=await supabase.auth.getUser();
+  const [{data:locations},{data:monuments},{data:roles}]=await Promise.all([
     supabase.from('locations').select('id,name').order('name'),
     supabase.from('monuments').select('id,name').order('name'),
+    user?supabase.from('member_roles').select('role').eq('member_id',user.id):Promise.resolve({data:[]}),
   ]);
+  const canDelete=(roles??[]).some((role)=>role.role==='admin');
   let item:Record<string,unknown>|undefined;
   if(id!=='nuevo'){
     const {data,error}=await supabase.from(tipo).select('*').eq('id',id).single();
@@ -19,6 +22,6 @@ export default async function ContentEditor({params,searchParams}:{params:Promis
   }
   return <>
     <header className="page-heading"><div><div className="muted">AAE-AAR · CMS</div><h1>{id==='nuevo'?`Nuevo · ${labels[tipo]}`:`Editar · ${labels[tipo]}`}</h1></div></header>
-    <ContentForm type={tipo} item={item} locations={(locations??[]) as {id:string;name:string}[]} monuments={(monuments??[]) as {id:string;name:string}[]} message={mensaje}/>
+    <ContentForm type={tipo} item={item} locations={(locations??[]) as {id:string;name:string}[]} monuments={(monuments??[]) as {id:string;name:string}[]} message={mensaje} canDelete={canDelete}/>
   </>;
 }
