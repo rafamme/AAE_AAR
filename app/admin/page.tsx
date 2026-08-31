@@ -11,7 +11,7 @@ export default async function AdminPage() {
   ]);
 
   return <>
-    <header className="page-heading"><div><div className="muted">AAE-AAR · Gestión interna</div><h1>Administración</h1><p>Resumen de socios y flujo editorial.</p></div></header>
+    <header className="page-heading"><div><div className="muted">AAE-AAR · Gestión interna</div><h1>Administración</h1><p>Socios, revisión editorial y contenidos públicos.</p></div></header>
     <section className="admin-stats">
       <article><strong>{pendingMembers ?? 0}</strong><span>Altas pendientes</span></article>
       <article><strong>{activeMembers ?? 0}</strong><span>Socios activos</span></article>
@@ -21,6 +21,7 @@ export default async function AdminPage() {
     <section className="dashboard-grid">
       <Link className="dashboard-card" href="/admin/socios"><h2>Gestión de socios</h2><p>Validación de altas, estados, número de socio y roles.</p></Link>
       <Link className="dashboard-card" href="/admin/aportaciones"><h2>Revisión editorial</h2><p>Revisar, publicar o archivar aportaciones enviadas.</p></Link>
+      <Link className="dashboard-card" href="/admin/contenidos"><h2>Gestión de contenidos</h2><p>Localidades, monumentos, noticias, eventos y medios.</p></Link>
     </section>
   </>;
 }
