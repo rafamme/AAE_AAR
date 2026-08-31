@@ -9,7 +9,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   const { data: roles } = await supabase.from('member_roles').select('role').eq('member_id', user.id);
   const roleSet = new Set((roles ?? []).map((item) => item.role));
-  const isAdmin = roleSet.has('admin');
+  const isSuperadmin = roleSet.has('superadmin');
+  const isAdmin = roleSet.has('admin') || isSuperadmin;
   const isEditor = roleSet.has('editor');
   if (!isAdmin && !isEditor) redirect('/area-socios?mensaje=No%20tienes%20permisos%20de%20administración.');
 
@@ -19,6 +20,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       {isAdmin && <Link href="/admin/socios">Socios</Link>}
       <Link href="/admin/aportaciones">Aportaciones</Link>
       <Link href="/admin/contenidos">Contenidos</Link>
+      {isSuperadmin && <Link href="/admin/sistema">Sistema</Link>}
       <Link href="/area-socios">Área de socios</Link>
     </nav>
     {children}
