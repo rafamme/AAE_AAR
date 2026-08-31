@@ -7,7 +7,9 @@ export default async function AdminMembersPage({ searchParams }: { searchParams:
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
   const { data: myRoles } = await supabase.from('member_roles').select('role').eq('member_id', user.id);
-  if (!(myRoles ?? []).some((item) => item.role === 'admin')) redirect('/admin');
+  const myRoleSet = new Set((myRoles ?? []).map((item) => item.role));
+  const isSuperadmin = myRoleSet.has('superadmin');
+  if (!isSuperadmin && !myRoleSet.has('admin')) redirect('/admin');
 
   const [{ data: members }, { data: roleRows }] = await Promise.all([
     supabase.from('members').select('id,member_number,first_name,last_name,status,email_public,joined_at,created_at').order('created_at', { ascending: true }),
@@ -23,9 +25,11 @@ export default async function AdminMembersPage({ searchParams }: { searchParams:
   return <>
     <header className="page-heading"><div><div className="muted">Administración</div><h1>Socios y permisos</h1><p>Valida altas, asigna número de socio y controla roles internos.</p></div></header>
     {mensaje && <p className="notice">{mensaje}</p>}
+    {isSuperadmin && <p className="notice">El rol <strong>superadmin</strong> concede acceso al control global del portal. La base de datos impide eliminar el último superadministrador activo.</p>}
     <section className="admin-member-list">
       {(members ?? []).map((member) => {
         const roles = rolesByMember.get(member.id) ?? new Set<string>();
+        const availableRoles = isSuperadmin ? ['superadmin','admin','editor','member'] as const : ['admin','editor','member'] as const;
         return <article className="admin-member-card" key={member.id}>
           <div className="admin-member-title"><div><div className="catalog-card-meta">{member.member_number ? `Socio nº ${member.member_number}` : 'Sin número'}</div><h2>{member.first_name} {member.last_name}</h2><p>{member.email_public || 'Sin email público'} · Estado: <strong>{member.status}</strong></p></div></div>
           <form action={updateMember} className="admin-inline-form">
@@ -36,7 +40,7 @@ export default async function AdminMembersPage({ searchParams }: { searchParams:
             <button type="submit">Guardar</button>
           </form>
           <div className="role-actions">
-            {(['admin','editor','member'] as const).map((role) => {
+            {availableRoles.map((role) => {
               const enabled = roles.has(role);
               return <form action={setMemberRole} key={role}><input type="hidden" name="member_id" value={member.id}/><input type="hidden" name="role" value={role}/><input type="hidden" name="enabled" value={enabled ? 'false' : 'true'}/><button className={enabled ? 'secondary' : ''} type="submit">{enabled ? `Quitar ${role}` : `Dar ${role}`}</button></form>;
             })}
