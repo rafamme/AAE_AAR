@@ -19,7 +19,7 @@ export default function ContributionForm({ contribution, locations, monuments, m
   monuments: Choice[];
   message?: string;
 }) {
-  const locked = Boolean(contribution?.submitted_at) || contribution?.status !== 'draft';
+  const locked = contribution ? Boolean(contribution.submitted_at) || contribution.status !== 'draft' : false;
   return <>
     {message && <p className="notice">{message}</p>}
     {locked && <p className="notice">Esta aportación ya fue enviada o revisada y no puede editarse.</p>}
