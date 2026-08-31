@@ -12,8 +12,9 @@ async function editorContext(){
   if(!user) redirect('/login');
   const {data:roles}=await supabase.from('member_roles').select('role').eq('member_id',user.id);
   const roleSet=new Set((roles??[]).map((r)=>r.role));
-  if(!roleSet.has('admin')&&!roleSet.has('editor')) redirect('/area-socios?mensaje=No%20tienes%20permisos%20editoriales.');
-  return {supabase,user,isAdmin:roleSet.has('admin')};
+  const isSuperadmin=roleSet.has('superadmin');
+  if(!isSuperadmin&&!roleSet.has('admin')&&!roleSet.has('editor')) redirect('/area-socios?mensaje=No%20tienes%20permisos%20editoriales.');
+  return {supabase,user,isAdmin:isSuperadmin||roleSet.has('admin')};
 }
 
 function text(fd:FormData,key:string){const v=String(fd.get(key)??'').trim();return v||null;}

@@ -14,7 +14,7 @@ async function currentRoles() {
 
 export async function updateMember(formData: FormData) {
   const { supabase, roles } = await currentRoles();
-  if (!roles.has('admin')) redirect('/admin');
+  if (!roles.has('admin') && !roles.has('superadmin')) redirect('/admin');
   const id = String(formData.get('id') || '');
   const status = String(formData.get('status') || 'pending');
   const numberRaw = String(formData.get('member_number') || '').trim();
@@ -28,23 +28,25 @@ export async function updateMember(formData: FormData) {
 
 export async function setMemberRole(formData: FormData) {
   const { supabase, user, roles } = await currentRoles();
-  if (!roles.has('admin')) redirect('/admin');
+  const isSuperadmin = roles.has('superadmin');
+  if (!roles.has('admin') && !isSuperadmin) redirect('/admin');
   const memberId = String(formData.get('member_id') || '');
   const role = String(formData.get('role') || '');
   const enabled = String(formData.get('enabled') || '') === 'true';
-  if (!['admin', 'editor', 'member'].includes(role)) redirect('/admin/socios?mensaje=Rol%20no%20válido.');
-  if (!enabled && memberId === user.id && role === 'admin') redirect('/admin/socios?mensaje=No%20puedes%20retirarte%20tu%20propio%20rol%20de%20administrador.');
+  if (!['superadmin', 'admin', 'editor', 'member'].includes(role)) redirect('/admin/socios?mensaje=Rol%20no%20válido.');
+  if (role === 'superadmin' && !isSuperadmin) redirect('/admin/socios?mensaje=Solo%20un%20superadministrador%20puede%20gestionar%20ese%20rol.');
+  if (!enabled && memberId === user.id && role === 'admin' && !isSuperadmin) redirect('/admin/socios?mensaje=No%20puedes%20retirarte%20tu%20propio%20rol%20de%20administrador.');
   const query = enabled
     ? supabase.from('member_roles').upsert({ member_id: memberId, role })
     : supabase.from('member_roles').delete().eq('member_id', memberId).eq('role', role);
   const { error } = await query;
-  revalidatePath('/admin/socios');
+  revalidatePath('/admin/socios'); revalidatePath('/admin/sistema');
   redirect(`/admin/socios?mensaje=${encodeURIComponent(error ? error.message : 'Roles actualizados.')}`);
 }
 
 export async function reviewContribution(formData: FormData) {
   const { supabase, user, roles } = await currentRoles();
-  if (!roles.has('admin') && !roles.has('editor')) redirect('/area-socios');
+  if (!roles.has('superadmin') && !roles.has('admin') && !roles.has('editor')) redirect('/area-socios');
   const id = String(formData.get('id') || '');
   const decision = String(formData.get('decision') || '');
   if (!['published', 'archived'].includes(decision)) redirect(`/admin/aportaciones/${id}?mensaje=Decisión%20no%20válida.`);

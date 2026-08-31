@@ -23,6 +23,13 @@ export async function login(formData: FormData) {
 }
 
 export async function register(formData: FormData) {
+  const supabase = await createClient();
+  const { data: flags } = await supabase.from('feature_flags').select('key,enabled').in('key', ['auth.registration','system.maintenance']);
+  const flagMap = new Map((flags ?? []).map((item) => [item.key, item.enabled]));
+  if (flagMap.get('auth.registration') === false || flagMap.get('system.maintenance') === true) {
+    redirect(withMessage('/registro', 'El registro de nuevos socios está temporalmente cerrado.'));
+  }
+
   const firstName = value(formData, 'first_name');
   const lastName = value(formData, 'last_name');
   const email = value(formData, 'email');
@@ -35,7 +42,6 @@ export async function register(formData: FormData) {
   if (password !== confirmPassword) redirect(withMessage('/registro', 'Las contraseñas no coinciden.'));
 
   const origin = (await headers()).get('origin') ?? '';
-  const supabase = await createClient();
   const { error } = await supabase.auth.signUp({
     email,
     password,
