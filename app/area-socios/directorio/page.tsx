@@ -81,6 +81,7 @@ export default async function DirectoryPage({
               {member.email && <a href={`mailto:${member.email}`}>{member.email}</a>}
               {member.phone && <a href={`tel:${member.phone}`}>{member.phone}</a>}
             </div>}
+            {member.id !== user.id && <p className="member-message-action"><Link className="button-link secondary" href={`/area-socios/mensajes/nuevo?destinatario=${member.id}`}>Enviar mensaje</Link></p>}
           </div>
         </article>;
       })}
