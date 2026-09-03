@@ -5,128 +5,23 @@ import { redirect } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/server';
 
 const allowed = new Set(['locations','monuments','posts','events','media']);
-
-async function editorContext(){
-  const supabase=await createClient();
-  const {data:{user}}=await supabase.auth.getUser();
-  if(!user) redirect('/login');
-  const {data:roles}=await supabase.from('member_roles').select('role').eq('member_id',user.id);
-  const roleSet=new Set((roles??[]).map((r)=>r.role));
-  const isSuperadmin=roleSet.has('superadmin');
-  if(!isSuperadmin&&!roleSet.has('admin')&&!roleSet.has('editor')) redirect('/area-socios?mensaje=No%20tienes%20permisos%20editoriales.');
-  return {supabase,user,isAdmin:isSuperadmin||roleSet.has('admin')};
-}
-
-function text(fd:FormData,key:string){const v=String(fd.get(key)??'').trim();return v||null;}
-function num(fd:FormData,key:string){const raw=String(fd.get(key)??'').trim();if(raw==='')return null;const value=Number(raw);return Number.isFinite(value)?value:NaN;}
-function status(fd:FormData){const v=String(fd.get('status')??'draft');return ['draft','published','archived'].includes(v)?v:'draft';}
-function fail(type:string,message:string,id?:string|null):never{redirect(`/admin/contenidos/${type}${id?`/${id}`:''}?mensaje=${encodeURIComponent(message)}`);}
-function validUrl(value:string|null){if(!value)return true;try{const url=new URL(value);return url.protocol==='http:'||url.protocol==='https:';}catch{return false;}}
+async function editorContext(){const supabase=await createClient();const {data:{user}}=await supabase.auth.getUser();if(!user)redirect('/login');const {data:roles}=await supabase.from('member_roles').select('role').eq('member_id',user.id);const roleSet=new Set((roles??[]).map(r=>r.role));const isSuperadmin=roleSet.has('superadmin');if(!isSuperadmin&&!roleSet.has('admin')&&!roleSet.has('editor'))redirect('/area-socios?mensaje=No%20tienes%20permisos%20editoriales.');return {supabase,user,isAdmin:isSuperadmin||roleSet.has('admin')};}
+function text(fd:FormData,key:string){const v=String(fd.get(key)??'').trim();return v||null;}function num(fd:FormData,key:string){const raw=String(fd.get(key)??'').trim();if(raw==='')return null;const value=Number(raw);return Number.isFinite(value)?value:NaN;}function status(fd:FormData){const v=String(fd.get('status')??'draft');return ['draft','published','archived'].includes(v)?v:'draft';}function fail(type:string,message:string,id?:string|null):never{redirect(`/admin/contenidos/${type}${id?`/${id}`:''}?mensaje=${encodeURIComponent(message)}`);}function validUrl(value:string|null){if(!value)return true;try{const url=new URL(value);return url.protocol==='http:'||url.protocol==='https:';}catch{return false;}}
 
 export async function saveContent(formData:FormData){
-  const type=String(formData.get('type')??'');
-  if(!allowed.has(type)) redirect('/admin/contenidos?mensaje=Tipo%20no%20válido.');
-  const id=text(formData,'id');
-  const {supabase,user}=await editorContext();
-  const nextStatus=status(formData);
-  let payload:Record<string,unknown>={status:nextStatus};
-  let uploadedPath:string|null=null;
-
-  if(type==='locations'){
-    const name=text(formData,'name');const country=text(formData,'country')??'España';const latitude=num(formData,'latitude');const longitude=num(formData,'longitude');
-    if(!name) fail(type,'El nombre es obligatorio.',id);
-    if(latitude===null||Number.isNaN(latitude)||latitude < -90||latitude > 90) fail(type,'La latitud debe estar entre -90 y 90.',id);
-    if(longitude===null||Number.isNaN(longitude)||longitude < -180||longitude > 180) fail(type,'La longitud debe estar entre -180 y 180.',id);
-    payload={...payload,name,country,region:text(formData,'region'),description:text(formData,'description'),latitude,longitude};
-  }
-
-  if(type==='monuments'){
-    const locationId=text(formData,'location_id');const name=text(formData,'name');const website=text(formData,'website_url');
-    if(!locationId||!name) fail(type,'Localidad y nombre son obligatorios.',id);
-    if(!validUrl(website)) fail(type,'La web debe usar http o https.',id);
-    payload={...payload,location_id:locationId,name,description:text(formData,'description'),century:text(formData,'century'),style:text(formData,'style'),architectural_type:text(formData,'architectural_type'),heritage_reference:text(formData,'heritage_reference'),website_url:website};
-  }
-
-  if(type==='posts'){
-    const title=text(formData,'title');const body=text(formData,'body');
-    if(!title||!body) fail(type,'Título y contenido son obligatorios.',id);
-    payload={...payload,title,excerpt:text(formData,'excerpt'),body,published_at:nextStatus==='published'?(text(formData,'published_at')??new Date().toISOString()):null};
-  }
-
-  if(type==='events'){
-    const title=text(formData,'title');const starts=text(formData,'starts_at');const ends=text(formData,'ends_at');const capacity=num(formData,'capacity');
-    if(!title||!starts||Number.isNaN(Date.parse(starts))) fail(type,'Título y fecha de inicio válidos son obligatorios.',id);
-    if(ends&&(Number.isNaN(Date.parse(ends))||Date.parse(ends)<Date.parse(starts))) fail(type,'La fecha de fin no puede ser anterior al inicio.',id);
-    if(capacity!==null&&(Number.isNaN(capacity)||!Number.isInteger(capacity)||capacity<1)) fail(type,'El aforo debe ser un entero positivo.',id);
-    if(id&&capacity!==null){const {data:current}=await supabase.from('events').select('registered_count').eq('id',id).single();if(current&&capacity<current.registered_count) fail(type,`El aforo no puede ser inferior a las ${current.registered_count} inscripciones actuales.`,id);}
-    payload={...payload,title,description:text(formData,'description'),starts_at:starts,ends_at:ends,location_id:text(formData,'location_id'),capacity};
-  }
-
+  const type=String(formData.get('type')??'');if(!allowed.has(type))redirect('/admin/contenidos?mensaje=Tipo%20no%20válido.');const id=text(formData,'id');const {supabase,user}=await editorContext();const nextStatus=status(formData);let payload:Record<string,unknown>={status:nextStatus};let uploadedPath:string|null=null;
+  if(type==='locations'){const name=text(formData,'name');const country=text(formData,'country')??'España';const latitude=num(formData,'latitude');const longitude=num(formData,'longitude');if(!name)fail(type,'El nombre es obligatorio.',id);if(latitude===null||Number.isNaN(latitude)||latitude < -90||latitude > 90)fail(type,'La latitud debe estar entre -90 y 90.',id);if(longitude===null||Number.isNaN(longitude)||longitude < -180||longitude > 180)fail(type,'La longitud debe estar entre -180 y 180.',id);payload={...payload,name,country,region:text(formData,'region'),description:text(formData,'description'),latitude,longitude};}
+  if(type==='monuments'){const locationId=text(formData,'location_id');const name=text(formData,'name');const website=text(formData,'website_url');if(!locationId||!name)fail(type,'Localidad y nombre son obligatorios.',id);if(!validUrl(website))fail(type,'La web debe usar http o https.',id);payload={...payload,location_id:locationId,name,description:text(formData,'description'),century:text(formData,'century'),style:text(formData,'style'),architectural_type:text(formData,'architectural_type'),heritage_reference:text(formData,'heritage_reference'),website_url:website};}
+  if(type==='posts'){const title=text(formData,'title');const body=text(formData,'body');if(!title||!body)fail(type,'Título y contenido son obligatorios.',id);payload={...payload,title,excerpt:text(formData,'excerpt'),body,published_at:nextStatus==='published'?(text(formData,'published_at')??new Date().toISOString()):null};}
+  if(type==='events'){const title=text(formData,'title');const starts=text(formData,'starts_at');const ends=text(formData,'ends_at');const capacity=num(formData,'capacity');if(!title||!starts||Number.isNaN(Date.parse(starts)))fail(type,'Título y fecha de inicio válidos son obligatorios.',id);if(ends&&(Number.isNaN(Date.parse(ends))||Date.parse(ends)<Date.parse(starts)))fail(type,'La fecha de fin no puede ser anterior al inicio.',id);if(capacity!==null&&(Number.isNaN(capacity)||!Number.isInteger(capacity)||capacity<1))fail(type,'El aforo debe ser un entero positivo.',id);if(id&&capacity!==null){const {data:current}=await supabase.from('events').select('registered_count').eq('id',id).single();if(current&&capacity<current.registered_count)fail(type,`El aforo no puede ser inferior a las ${current.registered_count} inscripciones actuales.`,id);}payload={...payload,title,description:text(formData,'description'),starts_at:starts,ends_at:ends,location_id:text(formData,'location_id'),capacity};}
   if(type==='media'){
-    const locationId=text(formData,'location_id');const monumentId=text(formData,'monument_id');const mediaType=text(formData,'media_type')??'image';const externalUrl=text(formData,'external_url');const sortOrder=num(formData,'sort_order')??0;
-    if((locationId?1:0)+(monumentId?1:0)!==1) fail(type,'El medio debe asociarse a una localidad o a un monumento, pero no a ambos.',id);
-    if(!['image','video','document'].includes(mediaType)) fail(type,'Tipo de medio no válido.',id);
-    if(!Number.isInteger(sortOrder)) fail(type,'El orden debe ser un número entero.',id);
-    if(!validUrl(externalUrl)) fail(type,'La URL externa debe usar http o https.',id);
-    payload={...payload,location_id:locationId,monument_id:monumentId,title:text(formData,'title'),description:text(formData,'description'),media_type:mediaType,external_url:externalUrl,thumbnail_path:text(formData,'thumbnail_path'),sort_order:sortOrder};
-
-    const file=formData.get('file');
-    if(file instanceof File&&file.size>0){
-      const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,'-');uploadedPath=`cms/${Date.now()}-${safe}`;
-      const {error:uploadError}=await supabase.storage.from('site-media').upload(uploadedPath,file,{upsert:false});
-      if(uploadError) fail(type,uploadError.message,id);
-      payload.storage_path=uploadedPath;
-    }else{
-      const {data:current}=id?await supabase.from('media').select('storage_path').eq('id',id).single():{data:null};
-      if(!externalUrl&&!current?.storage_path) fail(type,'Debe existir un archivo o una URL externa.',id);
-    }
+    const locationId=text(formData,'location_id');const monumentId=text(formData,'monument_id');const mediaType=text(formData,'media_type')??'image';const externalUrl=text(formData,'external_url');const sortOrder=num(formData,'sort_order')??0;const isFeatured=formData.get('is_featured')==='on';
+    if((locationId?1:0)+(monumentId?1:0)!==1)fail(type,'El medio debe asociarse a una localidad o a un monumento, pero no a ambos.',id);if(!['image','video','document'].includes(mediaType))fail(type,'Tipo de medio no válido.',id);if(isFeatured&&mediaType!=='image')fail(type,'Solo una imagen puede utilizarse como portada.',id);if(!Number.isInteger(sortOrder))fail(type,'El orden debe ser un número entero.',id);if(!validUrl(externalUrl))fail(type,'La URL externa debe usar http o https.',id);
+    payload={...payload,location_id:locationId,monument_id:monumentId,title:text(formData,'title'),description:text(formData,'description'),media_type:mediaType,external_url:externalUrl,thumbnail_path:text(formData,'thumbnail_path'),sort_order:sortOrder,is_featured:isFeatured};
+    const file=formData.get('file');if(file instanceof File&&file.size>0){const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,'-');uploadedPath=`cms/${Date.now()}-${safe}`;const {error:uploadError}=await supabase.storage.from('site-media').upload(uploadedPath,file,{upsert:false});if(uploadError)fail(type,uploadError.message,id);payload.storage_path=uploadedPath;}else{const {data:current}=id?await supabase.from('media').select('storage_path').eq('id',id).single():{data:null};if(!externalUrl&&!current?.storage_path)fail(type,'Debe existir un archivo o una URL externa.',id);}
   }
-
-  if(!id){
-    if(type==='locations'||type==='monuments'||type==='events') payload.created_by=user.id;
-    if(type==='posts') payload.author_id=user.id;
-    if(type==='media') payload.uploaded_by=user.id;
-  }
-
-  const query=id?supabase.from(type).update(payload).eq('id',id):supabase.from(type).insert(payload).select('id').single();
-  const {data,error}=await query;
-  if(error){if(uploadedPath)await supabase.storage.from('site-media').remove([uploadedPath]);fail(type,error.message,id);}
-  const target=id??(data as {id?:string}|null)?.id;
-  revalidatePath('/admin/contenidos');revalidatePath(`/admin/contenidos/${type}`);revalidatePath('/');revalidatePath('/patrimonio');revalidatePath('/eventos');
-  if(target) redirect(`/admin/contenidos/${type}/${target}?mensaje=Guardado.`);
-  redirect(`/admin/contenidos/${type}?mensaje=Guardado.`);
+  if(!id){if(type==='locations'||type==='monuments'||type==='events')payload.created_by=user.id;if(type==='posts')payload.author_id=user.id;if(type==='media')payload.uploaded_by=user.id;}
+  const query=id?supabase.from(type).update(payload).eq('id',id):supabase.from(type).insert(payload).select('id').single();const {data,error}=await query;if(error){if(uploadedPath)await supabase.storage.from('site-media').remove([uploadedPath]);fail(type,error.message,id);}const target=id??(data as {id?:string}|null)?.id;revalidatePath('/admin/contenidos');revalidatePath(`/admin/contenidos/${type}`);revalidatePath('/');revalidatePath('/patrimonio');revalidatePath('/eventos');if(target)redirect(`/admin/contenidos/${type}/${target}?mensaje=Guardado.`);redirect(`/admin/contenidos/${type}?mensaje=Guardado.`);
 }
 
-export async function deleteContent(formData:FormData){
-  const type=String(formData.get('type')??'');const id=String(formData.get('id')??'');const confirmation=String(formData.get('confirmation')??'').trim();
-  if(!allowed.has(type)||!id) redirect('/admin/contenidos');
-  const {supabase,isAdmin}=await editorContext();
-  if(!isAdmin) fail(type,'Solo un administrador puede eliminar contenido de forma definitiva.',id);
-  if(confirmation!=='ELIMINAR') fail(type,'Escribe ELIMINAR para confirmar el borrado definitivo.',id);
-
-  const {data:item,error:itemError}=await supabase.from(type).select('*').eq('id',id).single();
-  if(itemError||!item) fail(type,'No se ha podido cargar el contenido.',id);
-  if(item.status!=='archived') fail(type,'Solo se puede eliminar definitivamente contenido archivado.',id);
-
-  if(type==='locations'){
-    const [{count:monuments},{count:events},{count:media}]=await Promise.all([
-      supabase.from('monuments').select('*',{count:'exact',head:true}).eq('location_id',id),
-      supabase.from('events').select('*',{count:'exact',head:true}).eq('location_id',id),
-      supabase.from('media').select('*',{count:'exact',head:true}).eq('location_id',id),
-    ]);
-    if((monuments??0)+(events??0)+(media??0)>0) fail(type,'No se puede eliminar una localidad con monumentos, eventos o medios asociados.',id);
-  }
-  if(type==='monuments'){
-    const {count}=await supabase.from('media').select('*',{count:'exact',head:true}).eq('monument_id',id);
-    if((count??0)>0) fail(type,'No se puede eliminar un monumento con medios asociados.',id);
-  }
-  if(type==='events'&&Number(item.registered_count??0)>0) fail(type,'No se puede eliminar un evento que tenga inscripciones.',id);
-
-  const storagePath=type==='media'?String(item.storage_path??'').trim():'';
-  const {error}=await supabase.from(type).delete().eq('id',id);
-  if(error) fail(type,error.message,id);
-  if(storagePath) await supabase.storage.from('site-media').remove([storagePath]);
-
-  revalidatePath('/admin/contenidos');revalidatePath(`/admin/contenidos/${type}`);revalidatePath('/');revalidatePath('/patrimonio');revalidatePath('/eventos');
-  redirect(`/admin/contenidos/${type}?mensaje=Eliminado%20definitivamente.`);
-}
+export async function deleteContent(formData:FormData){const type=String(formData.get('type')??'');const id=String(formData.get('id')??'');const confirmation=String(formData.get('confirmation')??'').trim();if(!allowed.has(type)||!id)redirect('/admin/contenidos');const {supabase,isAdmin}=await editorContext();if(!isAdmin)fail(type,'Solo un administrador puede eliminar contenido de forma definitiva.',id);if(confirmation!=='ELIMINAR')fail(type,'Escribe ELIMINAR para confirmar el borrado definitivo.',id);const {data:item,error:itemError}=await supabase.from(type).select('*').eq('id',id).single();if(itemError||!item)fail(type,'No se ha podido cargar el contenido.',id);if(item.status!=='archived')fail(type,'Solo se puede eliminar definitivamente contenido archivado.',id);if(type==='locations'){const [{count:monuments},{count:events},{count:media}]=await Promise.all([supabase.from('monuments').select('*',{count:'exact',head:true}).eq('location_id',id),supabase.from('events').select('*',{count:'exact',head:true}).eq('location_id',id),supabase.from('media').select('*',{count:'exact',head:true}).eq('location_id',id)]);if((monuments??0)+(events??0)+(media??0)>0)fail(type,'No se puede eliminar una localidad con monumentos, eventos o medios asociados.',id);}if(type==='monuments'){const {count}=await supabase.from('media').select('*',{count:'exact',head:true}).eq('monument_id',id);if((count??0)>0)fail(type,'No se puede eliminar un monumento con medios asociados.',id);}if(type==='events'&&Number(item.registered_count??0)>0)fail(type,'No se puede eliminar un evento que tenga inscripciones.',id);const storagePath=type==='media'?String(item.storage_path??'').trim():'';const {error}=await supabase.from(type).delete().eq('id',id);if(error)fail(type,error.message,id);if(storagePath)await supabase.storage.from('site-media').remove([storagePath]);revalidatePath('/admin/contenidos');revalidatePath(`/admin/contenidos/${type}`);revalidatePath('/');revalidatePath('/patrimonio');revalidatePath('/eventos');redirect(`/admin/contenidos/${type}?mensaje=Eliminado%20definitivamente.`);}
