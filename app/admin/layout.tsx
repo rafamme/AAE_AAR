@@ -18,6 +18,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <nav className="admin-nav">
       <Link href="/admin">Resumen</Link>
       {isAdmin && <Link href="/admin/socios">Socios</Link>}
+      <Link href="/admin/eventos">Eventos</Link>
       <Link href="/admin/aportaciones">Aportaciones</Link>
       <Link href="/admin/contenidos">Contenidos</Link>
       {isSuperadmin && <Link href="/admin/sistema">Sistema</Link>}
