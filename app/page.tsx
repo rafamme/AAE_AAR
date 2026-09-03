@@ -9,6 +9,7 @@ export default async function Home(){
   const maintenance=control.enabled('system.maintenance');
   const catalogEnabled=control.enabled('public.catalog')&&!maintenance;
   const registrationEnabled=control.enabled('auth.registration')&&!maintenance;
+  const freeMemberArea=control.enabled('testing.member_area_open')&&!maintenance;
 
   let locations=await (catalogEnabled?getPublishedLocations():Promise.resolve([]));
   let mapLocations:any[]=[];
@@ -46,9 +47,10 @@ export default async function Home(){
     <div className="top-actions">
       {catalogEnabled&&<Link className="button-link secondary" href="/patrimonio">Explorar patrimonio</Link>}
       {registrationEnabled&&<Link className="button-link secondary" href="/registro">Solicitar alta</Link>}
-      <Link className="button-link" href={user?'/area-socios':'/login'}>{user?'Mi cuenta':'Área de socios'}</Link>
+      <Link className="button-link" href={user||freeMemberArea?'/area-socios':'/login'}>{user?'Mi cuenta':freeMemberArea?'Área de socios · pruebas':'Área de socios'}</Link>
       {isSuperadmin&&<Link className="button-link" href="/admin/sistema">⚙ Ajustes y configuración</Link>}
     </div>
+    {freeMemberArea&&!user&&<p className="notice">Acceso temporal de pruebas al área de socios activado. Los datos privados siguen protegidos.</p>}
     <section className="hero">
       <div className="muted">{control.setting('site.name','AAE-AAR')}</div>
       <h1>{maintenance?'Portal en mantenimiento':'El románico, sobre el mapa'}</h1>
