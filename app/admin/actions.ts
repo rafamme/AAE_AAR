@@ -73,6 +73,18 @@ export async function setMemberRole(formData: FormData) {
   redirect(`/admin/socios?mensaje=${encodeURIComponent(error ? error.message : 'Roles actualizados.')}`);
 }
 
+export async function updateEventRegistrationStatus(formData: FormData) {
+  const { supabase, roles } = await currentRoles();
+  if (!roles.has('superadmin') && !roles.has('admin') && !roles.has('editor')) redirect('/area-socios');
+  const eventId = String(formData.get('event_id') || '');
+  const memberId = String(formData.get('member_id') || '');
+  const status = String(formData.get('status') || 'registered');
+  if (!['registered','cancelled','attended','no_show'].includes(status)) redirect('/admin/eventos?mensaje=Estado%20de%20inscripción%20no%20válido.');
+  const { error } = await supabase.from('event_members').update({ status }).eq('event_id', eventId).eq('member_id', memberId);
+  revalidatePath('/admin'); revalidatePath('/admin/eventos'); revalidatePath('/eventos'); revalidatePath(`/eventos/${eventId}`); revalidatePath('/area-socios/eventos');
+  redirect(`/admin/eventos?mensaje=${encodeURIComponent(error ? error.message : 'Inscripción actualizada.')}`);
+}
+
 export async function reviewContribution(formData: FormData) {
   const { supabase, user, roles } = await currentRoles();
   if (!roles.has('superadmin') && !roles.has('admin') && !roles.has('editor')) redirect('/area-socios');
