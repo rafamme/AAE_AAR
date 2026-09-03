@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { saveContribution, submitContribution } from './actions';
+import MediaUploader from './MediaUploader';
 
 type Choice = { id: string; name: string; location_id?: string };
 type Contribution = {
@@ -40,7 +41,8 @@ export default function ContributionForm({ contribution, locations, monuments, m
       <label>Contenido<textarea name="content" rows={12} defaultValue={contribution?.content ?? ''} disabled={locked} /></label>
       {!locked && <div className="form-actions"><button type="submit">Guardar borrador</button><Link className="button-link secondary" href="/area-socios/aportaciones">Volver</Link></div>}
     </form>
-    {contribution && !locked && <form action={submitContribution} className="submit-contribution"><input type="hidden" name="id" value={contribution.id} /><p>La revisión editorial comprobará los datos antes de incorporarlos al catálogo público.</p><button type="submit">Enviar a revisión</button></form>}
+    {contribution ? <MediaUploader contributionId={contribution.id} locked={locked}/> : <p className="notice">Guarda primero el borrador para poder adjuntar fotografías, vídeos o documentos.</p>}
+    {contribution && !locked && <form action={submitContribution} className="submit-contribution"><input type="hidden" name="id" value={contribution.id} /><p>La revisión editorial comprobará los datos y los archivos adjuntos antes de incorporarlos al catálogo público.</p><button type="submit">Enviar a revisión</button></form>}
     {locked && <p><Link href="/area-socios/aportaciones">← Volver a mis aportaciones</Link></p>}
   </>;
 }
