@@ -33,25 +33,14 @@ async function setSavedState(formData: FormData, field: 'is_favorite' | 'wants_t
   let query = supabase.from('member_saved_places').select('id,is_favorite,wants_to_visit').eq('member_id', user.id);
   query = targetQuery(query, target);
   const { data: current } = await query.maybeSingle();
-
   if (current) {
     const nextFavorite = field === 'is_favorite' ? next : current.is_favorite;
     const nextVisit = field === 'wants_to_visit' ? next : current.wants_to_visit;
-    if (!nextFavorite && !nextVisit) {
-      await supabase.from('member_saved_places').delete().eq('id', current.id);
-    } else {
-      await supabase.from('member_saved_places').update({ [field]: next }).eq('id', current.id);
-    }
+    if (!nextFavorite && !nextVisit) await supabase.from('member_saved_places').delete().eq('id', current.id);
+    else await supabase.from('member_saved_places').update({ [field]: next }).eq('id', current.id);
   } else if (next) {
-    await supabase.from('member_saved_places').insert({
-      member_id: user.id,
-      location_id: target.locationId ?? null,
-      monument_id: target.monumentId ?? null,
-      is_favorite: field === 'is_favorite',
-      wants_to_visit: field === 'wants_to_visit',
-    });
+    await supabase.from('member_saved_places').insert({member_id:user.id,location_id:target.locationId??null,monument_id:target.monumentId??null,is_favorite:field==='is_favorite',wants_to_visit:field==='wants_to_visit'});
   }
-
   revalidatePath('/area-socios/visitas');
   if (target.locationId) revalidatePath(`/patrimonio/localidades/${target.locationId}`);
   if (target.monumentId) revalidatePath(`/patrimonio/monumentos/${target.monumentId}`);
@@ -81,4 +70,55 @@ export async function addSavedPlaceToRoute(formData: FormData) {
   if (error) redirect(`/area-socios/visitas?mensaje=${encodeURIComponent(error.message)}`);
   revalidatePath('/area-socios/visitas');
   redirect('/area-socios/visitas?mensaje=Añadido%20a%20la%20ruta.');
+}
+
+export async function updatePersonalRoute(formData: FormData) {
+  const { supabase, user } = await activeMemberContext();
+  const routeId=String(formData.get('route_id')??'').trim();
+  const title=String(formData.get('title')??'').trim();
+  const notes=String(formData.get('notes')??'').trim()||null;
+  if(!routeId||!title) redirect('/area-socios/visitas?mensaje=Datos%20de%20ruta%20incompletos.');
+  const {error}=await supabase.from('member_visit_routes').update({title,notes}).eq('id',routeId).eq('member_id',user.id);
+  if(error) redirect(`/area-socios/visitas?mensaje=${encodeURIComponent(error.message)}`);
+  revalidatePath('/area-socios/visitas');
+  redirect('/area-socios/visitas?mensaje=Ruta%20actualizada.');
+}
+
+export async function deletePersonalRoute(formData: FormData) {
+  const { supabase, user } = await activeMemberContext();
+  const routeId=String(formData.get('route_id')??'').trim();
+  if(routeId) await supabase.from('member_visit_routes').delete().eq('id',routeId).eq('member_id',user.id);
+  revalidatePath('/area-socios/visitas');
+  redirect('/area-socios/visitas?mensaje=Ruta%20eliminada.');
+}
+
+export async function updatePersonalStop(formData: FormData) {
+  const { supabase } = await activeMemberContext();
+  const stopId=String(formData.get('stop_id')??'').trim();
+  const note=String(formData.get('note')??'').trim()||null;
+  if(stopId) await supabase.from('member_visit_route_stops').update({note}).eq('id',stopId);
+  revalidatePath('/area-socios/visitas');
+}
+
+export async function removePersonalStop(formData: FormData) {
+  const { supabase } = await activeMemberContext();
+  const stopId=String(formData.get('stop_id')??'').trim();
+  if(stopId) await supabase.from('member_visit_route_stops').delete().eq('id',stopId);
+  revalidatePath('/area-socios/visitas');
+}
+
+export async function movePersonalStop(formData: FormData) {
+  const { supabase } = await activeMemberContext();
+  const stopId=String(formData.get('stop_id')??'').trim();
+  const routeId=String(formData.get('route_id')??'').trim();
+  const direction=String(formData.get('direction')??'');
+  const {data:stops}=await supabase.from('member_visit_route_stops').select('id,sort_order').eq('route_id',routeId).order('sort_order');
+  const list=stops??[];const index=list.findIndex(x=>x.id===stopId);const swapIndex=direction==='up'?index-1:index+1;
+  if(index>=0&&swapIndex>=0&&swapIndex<list.length){
+    const a=list[index],b=list[swapIndex];
+    await supabase.from('member_visit_route_stops').update({sort_order:-1}).eq('id',a.id);
+    await supabase.from('member_visit_route_stops').update({sort_order:a.sort_order}).eq('id',b.id);
+    await supabase.from('member_visit_route_stops').update({sort_order:b.sort_order}).eq('id',a.id);
+  }
+  revalidatePath('/area-socios/visitas');
 }
