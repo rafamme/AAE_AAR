@@ -10,7 +10,7 @@ export default async function ContributionPage({params,searchParams}:{params:Pro
   const {data:member}=await supabase.from('members').select('status').eq('id',user.id).single();
   if(!member||member.status!=='active') redirect('/area-socios');
   const [{data:contribution},{data:locations},{data:monuments}]=await Promise.all([
-    supabase.from('contributions').select('id,title,description,content,location_id,monument_id,submitted_at,status').eq('id',id).eq('contributor_id',user.id).maybeSingle(),
+    supabase.from('contributions').select('id,title,description,content,location_id,monument_id,submitted_at,status,proposal_type,proposed_name,proposed_country,proposed_region,proposed_latitude,proposed_longitude,proposed_century,proposed_style,proposed_architectural_type,proposed_website_url').eq('id',id).eq('contributor_id',user.id).maybeSingle(),
     supabase.from('locations').select('id,name').eq('status','published').order('name'),
     supabase.from('monuments').select('id,name,location_id').eq('status','published').order('name')
   ]);
