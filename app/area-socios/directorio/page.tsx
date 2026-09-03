@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/server';
+import { getSiteControl } from '../../../lib/site-control';
 
 type DirectoryMember = {
   id: string;
@@ -20,7 +21,8 @@ export default async function DirectoryPage({
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
-  const supabase = await createClient();
+  const [supabase, control] = await Promise.all([createClient(), getSiteControl()]);
+  const fullTestAccess = control.enabled('testing.full_access');
   const { data: authData } = await supabase.auth.getUser();
   const user = authData.user;
   if (!user) redirect('/login');
@@ -31,7 +33,7 @@ export default async function DirectoryPage({
     .eq('id', user.id)
     .single();
 
-  if (!me || me.status !== 'active') {
+  if (!fullTestAccess && (!me || me.status !== 'active')) {
     redirect('/area-socios?mensaje=El%20directorio%20solo%20está%20disponible%20para%20socios%20activos.');
   }
 
@@ -58,6 +60,7 @@ export default async function DirectoryPage({
       </div>
       <Link className="button-link secondary" href="/area-socios">Área de socios</Link>
     </header>
+    {fullTestAccess && <p className="notice">Modo de prueba total activo: no se bloquea el acceso por estado del socio.</p>}
 
     <form className="directory-search" action="/area-socios/directorio" method="get">
       <label htmlFor="q">Buscar por nombre, localidad, región, país o número de socio</label>
