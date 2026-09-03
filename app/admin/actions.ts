@@ -109,10 +109,75 @@ export async function reviewContribution(formData: FormData) {
 }
 
 export async function publishContributionToCatalog(formData: FormData) {
-  const { supabase, roles } = await currentRoles();
+  const { supabase, user, roles } = await currentRoles();
   if (!roles.has('superadmin') && !roles.has('admin') && !roles.has('editor')) redirect('/area-socios');
   const id = String(formData.get('id') || '');
-  const { error } = await supabase.rpc('publish_contribution_to_catalog', { target_contribution_id: id });
+
+  const { data: before, error: beforeError } = await supabase.from('contributions')
+    .select('id,status,location_id,monument_id,published_location_id,published_monument_id,catalog_published_at')
+    .eq('id', id).single();
+  if (beforeError || !before) redirect(`/admin/aportaciones/${id}?mensaje=${encodeURIComponent(beforeError?.message || 'Aportación no encontrada.')}`);
+  if (before.status !== 'published') redirect(`/admin/aportaciones/${id}?mensaje=${encodeURIComponent('La aportación debe estar aprobada antes de publicarse.')}`);
+
+  if (!before.catalog_published_at) {
+    const { error } = await supabase.rpc('publish_contribution_to_catalog', { target_contribution_id: id });
+    if (error) redirect(`/admin/aportaciones/${id}?mensaje=${encodeURIComponent(error.message)}`);
+  }
+
+  const { data: contribution, error: contributionError } = await supabase.from('contributions')
+    .select('location_id,monument_id,published_location_id,published_monument_id,catalog_published_at')
+    .eq('id', id).single();
+  if (contributionError || !contribution) redirect(`/admin/aportaciones/${id}?mensaje=${encodeURIComponent(contributionError?.message || 'No se pudo recuperar el contenido publicado.')}`);
+
+  const targetMonumentId = contribution.published_monument_id || contribution.monument_id || null;
+  const targetLocationId = targetMonumentId ? null : (contribution.published_location_id || contribution.location_id || null);
+  const { data: attachments, error: attachmentError } = await supabase.from('contribution_media')
+    .select('id,title,description,media_type,storage_path,published_media_id')
+    .eq('contribution_id', id)
+    .is('published_media_id', null);
+  if (attachmentError) redirect(`/admin/aportaciones/${id}?mensaje=${encodeURIComponent(attachmentError.message)}`);
+
+  const failures: string[] = [];
+  for (const attachment of attachments ?? []) {
+    const fileName = attachment.storage_path.split('/').pop() || `${attachment.id}`;
+    const sitePath = `contributions/${id}/${attachment.id}-${fileName}`;
+    const { data: downloadData, error: downloadError } = await supabase.storage.from('member-files').download(attachment.storage_path);
+    if (downloadError || !downloadData) { failures.push(`${fileName}: ${downloadError?.message || 'no se pudo leer'}`); continue; }
+
+    const { error: uploadError } = await supabase.storage.from('site-media').upload(sitePath, downloadData, {
+      contentType: downloadData.type || undefined,
+      upsert: true,
+    });
+    if (uploadError) { failures.push(`${fileName}: ${uploadError.message}`); continue; }
+
+    let mediaId: string | null = null;
+    const { data: existing } = await supabase.from('media').select('id').eq('storage_path', sitePath).maybeSingle();
+    if (existing?.id) mediaId = existing.id;
+    else {
+      const { data: created, error: mediaError } = await supabase.from('media').insert({
+        location_id: targetLocationId,
+        monument_id: targetMonumentId,
+        title: attachment.title,
+        description: attachment.description,
+        media_type: attachment.media_type,
+        storage_path: sitePath,
+        status: 'published',
+        uploaded_by: user.id,
+      }).select('id').single();
+      if (mediaError || !created) { failures.push(`${fileName}: ${mediaError?.message || 'no se pudo registrar'}`); continue; }
+      mediaId = created.id;
+    }
+
+    const { error: markError } = await supabase.from('contribution_media').update({ status: 'published', published_media_id: mediaId }).eq('id', attachment.id);
+    if (markError) failures.push(`${fileName}: ${markError.message}`);
+  }
+
   revalidatePath('/'); revalidatePath('/patrimonio'); revalidatePath('/mapa'); revalidatePath('/admin'); revalidatePath('/admin/aportaciones'); revalidatePath(`/admin/aportaciones/${id}`); revalidatePath('/area-socios/aportaciones');
-  redirect(`/admin/aportaciones/${id}?mensaje=${encodeURIComponent(error ? error.message : 'Aportación incorporada al patrimonio público.')}`);
+  if (targetMonumentId) revalidatePath(`/patrimonio/monumentos/${targetMonumentId}`);
+  if (targetLocationId) revalidatePath(`/patrimonio/localidades/${targetLocationId}`);
+
+  const message = failures.length
+    ? `La ficha está publicada, pero ${failures.length} archivo(s) quedaron pendientes: ${failures.join(' | ')}`
+    : `Aportación incorporada al patrimonio público${(attachments ?? []).length ? ' con sus archivos multimedia.' : '.'}`;
+  redirect(`/admin/aportaciones/${id}?mensaje=${encodeURIComponent(message)}`);
 }
