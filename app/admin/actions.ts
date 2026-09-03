@@ -105,5 +105,14 @@ export async function reviewContribution(formData: FormData) {
   if (!['published', 'archived'].includes(decision)) redirect(`/admin/aportaciones/${id}?mensaje=Decisión%20no%20válida.`);
   const { error } = await supabase.from('contributions').update({ status: decision, reviewed_by: user.id, reviewed_at: new Date().toISOString() }).eq('id', id).not('submitted_at', 'is', null);
   revalidatePath('/admin'); revalidatePath('/admin/aportaciones'); revalidatePath(`/admin/aportaciones/${id}`); revalidatePath('/area-socios/aportaciones');
-  redirect(`/admin/aportaciones/${id}?mensaje=${encodeURIComponent(error ? error.message : decision === 'published' ? 'Aportación publicada.' : 'Aportación archivada.')}`);
+  redirect(`/admin/aportaciones/${id}?mensaje=${encodeURIComponent(error ? error.message : decision === 'published' ? 'Aportación aprobada. Ya puede incorporarse al patrimonio.' : 'Aportación archivada.')}`);
+}
+
+export async function publishContributionToCatalog(formData: FormData) {
+  const { supabase, roles } = await currentRoles();
+  if (!roles.has('superadmin') && !roles.has('admin') && !roles.has('editor')) redirect('/area-socios');
+  const id = String(formData.get('id') || '');
+  const { error } = await supabase.rpc('publish_contribution_to_catalog', { target_contribution_id: id });
+  revalidatePath('/'); revalidatePath('/patrimonio'); revalidatePath('/mapa'); revalidatePath('/admin'); revalidatePath('/admin/aportaciones'); revalidatePath(`/admin/aportaciones/${id}`); revalidatePath('/area-socios/aportaciones');
+  redirect(`/admin/aportaciones/${id}?mensaje=${encodeURIComponent(error ? error.message : 'Aportación incorporada al patrimonio público.')}`);
 }
