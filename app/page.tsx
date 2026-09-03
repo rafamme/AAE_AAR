@@ -2,6 +2,7 @@ import Link from 'next/link';
 import MapLoader from '../components/MapLoader';
 import { getPublishedLocations } from '../lib/catalog';
 import { getSiteControl } from '../lib/site-control';
+import { createClient } from '../lib/supabase/server';
 
 export default async function Home(){
   const control = await getSiteControl();
@@ -10,11 +11,24 @@ export default async function Home(){
   const registrationEnabled = control.enabled('auth.registration') && !maintenance;
   const locations = catalogEnabled ? await getPublishedLocations() : [];
 
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  let isSuperadmin = false;
+
+  if (user) {
+    const { data: roles } = await supabase
+      .from('member_roles')
+      .select('role')
+      .eq('member_id', user.id);
+    isSuperadmin = (roles ?? []).some((item) => item.role === 'superadmin');
+  }
+
   return <main className="wrap">
     <div className="top-actions">
       {catalogEnabled && <Link className="button-link secondary" href="/patrimonio">Explorar patrimonio</Link>}
       {registrationEnabled && <Link className="button-link secondary" href="/registro">Solicitar alta</Link>}
       <Link className="button-link" href="/login">Área de socios</Link>
+      {isSuperadmin && <Link className="button-link" href="/admin/sistema">⚙ Ajustes y configuración</Link>}
     </div>
 
     <section className="hero">
