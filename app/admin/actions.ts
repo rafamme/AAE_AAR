@@ -85,6 +85,18 @@ export async function updateEventRegistrationStatus(formData: FormData) {
   redirect(`/admin/eventos?mensaje=${encodeURIComponent(error ? error.message : 'Inscripción actualizada.')}`);
 }
 
+export async function sendAnnouncement(formData: FormData) {
+  const { supabase, roles } = await currentRoles();
+  if (!roles.has('admin') && !roles.has('superadmin')) redirect('/admin');
+  const subject = String(formData.get('subject') || '').trim();
+  const body = String(formData.get('body') || '').trim();
+  if (!subject || !body) redirect('/admin/comunicaciones?mensaje=Asunto%20y%20mensaje%20son%20obligatorios.');
+  if (subject.length > 160 || body.length > 10000) redirect('/admin/comunicaciones?mensaje=El%20comunicado%20es%20demasiado%20largo.');
+  const { data, error } = await supabase.rpc('create_announcement_thread', { p_subject: subject, p_body: body });
+  revalidatePath('/admin/comunicaciones'); revalidatePath('/area-socios'); revalidatePath('/area-socios/mensajes');
+  redirect(`/admin/comunicaciones?mensaje=${encodeURIComponent(error ? error.message : `Comunicado enviado correctamente${data ? '.' : '.'}`)}`);
+}
+
 export async function reviewContribution(formData: FormData) {
   const { supabase, user, roles } = await currentRoles();
   if (!roles.has('superadmin') && !roles.has('admin') && !roles.has('editor')) redirect('/area-socios');
