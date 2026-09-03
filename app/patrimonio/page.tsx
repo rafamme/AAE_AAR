@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import HeritageExplorer from '../../components/HeritageExplorer';
 import { getPublishedLocations, getPublishedMonuments } from '../../lib/catalog';
 
 export default async function HeritagePage() {
@@ -7,13 +8,8 @@ export default async function HeritagePage() {
     getPublishedMonuments(),
   ]);
 
-  const monumentsByLocation = new Map<string, number>();
-  monuments.forEach((monument) => {
-    monumentsByLocation.set(
-      monument.location_id,
-      (monumentsByLocation.get(monument.location_id) ?? 0) + 1,
-    );
-  });
+  const countries = new Set(locations.map((item) => item.country));
+  const regions = new Set(locations.map((item) => item.region).filter(Boolean));
 
   return (
     <main className="wrap catalog-page">
@@ -24,70 +20,21 @@ export default async function HeritagePage() {
       </nav>
 
       <header className="catalog-hero">
-        <div className="eyebrow">Patrimonio románico</div>
-        <h1>Localidades y monumentos</h1>
+        <div className="eyebrow">Patrimonio románico europeo</div>
+        <h1>Explora por territorio, localidad y monumento</h1>
         <p>
-          Consulta el catálogo público de la asociación. Solo aparecen contenidos
-          revisados y publicados.
+          Busca y filtra el catálogo público de la asociación por país, región,
+          localidad, monumento, estilo o siglo. Solo aparecen contenidos revisados y publicados.
         </p>
+        <div className="catalog-stat-strip">
+          <span><strong>{countries.size}</strong> países</span>
+          <span><strong>{regions.size}</strong> regiones</span>
+          <span><strong>{locations.length}</strong> localidades</span>
+          <span><strong>{monuments.length}</strong> monumentos</span>
+        </div>
       </header>
 
-      <section className="catalog-section">
-        <div className="section-heading">
-          <div>
-            <div className="eyebrow">Localidades</div>
-            <h2>{locations.length} destinos publicados</h2>
-          </div>
-        </div>
-
-        <div className="catalog-grid">
-          {locations.map((location) => (
-            <Link
-              className="catalog-card"
-              href={`/patrimonio/localidades/${location.id}`}
-              key={location.id}
-            >
-              <div className="catalog-card-meta">
-                {location.region ? `${location.region} · ` : ''}
-                {location.country}
-              </div>
-              <h3>{location.name}</h3>
-              <p>{location.description ?? 'Ficha patrimonial de la localidad.'}</p>
-              <div className="catalog-card-footer">
-                {monumentsByLocation.get(location.id) ?? 0} monumento(s)
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      <section className="catalog-section">
-        <div className="section-heading">
-          <div>
-            <div className="eyebrow">Monumentos</div>
-            <h2>{monuments.length} fichas publicadas</h2>
-          </div>
-        </div>
-
-        <div className="catalog-grid">
-          {monuments.map((monument) => (
-            <Link
-              className="catalog-card"
-              href={`/patrimonio/monumentos/${monument.id}`}
-              key={monument.id}
-            >
-              <div className="catalog-card-meta">
-                {[monument.architectural_type, monument.century]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </div>
-              <h3>{monument.name}</h3>
-              <p>{monument.description ?? 'Ficha patrimonial del monumento.'}</p>
-              <div className="catalog-card-footer">Ver ficha completa →</div>
-            </Link>
-          ))}
-        </div>
-      </section>
+      <HeritageExplorer locations={locations} monuments={monuments} />
     </main>
   );
 }
