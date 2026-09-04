@@ -1,15 +1,17 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/server';
+import { getSiteControl } from '../../../lib/site-control';
 import { approveMember, rejectMember, setMemberRole, updateMember } from '../actions';
 
 export default async function AdminMembersPage({ searchParams }: { searchParams: Promise<{ mensaje?: string; estado?: string }> }) {
-  const supabase = await createClient();
+  const [supabase, control] = await Promise.all([createClient(), getSiteControl()]);
+  const fullTestAccess = control.enabled('testing.full_access');
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
   const { data: myRoles } = await supabase.from('member_roles').select('role').eq('member_id', user.id);
   const myRoleSet = new Set((myRoles ?? []).map((item) => item.role));
-  const isSuperadmin = myRoleSet.has('superadmin');
-  if (!isSuperadmin && !myRoleSet.has('admin')) redirect('/admin');
+  const isSuperadmin = fullTestAccess || myRoleSet.has('superadmin');
+  if (!fullTestAccess && !isSuperadmin && !myRoleSet.has('admin')) redirect('/admin');
 
   const params = await searchParams;
   const statusFilter = ['pending','active','suspended','inactive'].includes(params.estado || '') ? params.estado! : '';
@@ -29,6 +31,7 @@ export default async function AdminMembersPage({ searchParams }: { searchParams:
 
   return <>
     <header className="page-heading"><div><div className="muted">Administración · FASE 4.1</div><h1>Socios y altas</h1><p>Revisa solicitudes, aprueba altas con numeración automática y controla estados y permisos.</p></div></header>
+    {fullTestAccess && <p className="notice">Modo beta total: esta gestión está habilitada para la identidad anónima de pruebas.</p>}
     {params.mensaje && <p className="notice">{params.mensaje}</p>}
     <nav className="admin-nav">
       <a href="/admin/socios">Todos ({allMembers?.length ?? 0})</a>
