@@ -29,7 +29,13 @@ export async function middleware(request: NextRequest) {
       .maybeSingle();
 
     if (betaFlag?.enabled) {
-      await supabase.auth.signInAnonymously();
+      const { data, error } = await supabase.auth.signInAnonymously();
+      if (!error && data.user) {
+        await supabase
+          .from('members')
+          .update({ status: 'active', joined_at: new Date().toISOString().slice(0, 10) })
+          .eq('id', data.user.id);
+      }
     }
   }
 
