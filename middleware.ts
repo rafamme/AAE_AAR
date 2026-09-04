@@ -20,7 +20,20 @@ export async function middleware(request: NextRequest) {
     },
   });
 
-  await supabase.auth.getClaims();
+  const { data: claimsData } = await supabase.auth.getClaims();
+  if (!claimsData?.claims) {
+    const { data: betaFlag } = await supabase
+      .from('feature_flags')
+      .select('enabled')
+      .eq('key', 'testing.full_access')
+      .maybeSingle();
+
+    if (betaFlag?.enabled) {
+      await supabase.auth.signInAnonymously();
+    }
+  }
+
+  response.headers.set('Cache-Control', 'private, no-store');
   return response;
 }
 
