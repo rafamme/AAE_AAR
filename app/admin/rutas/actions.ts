@@ -3,17 +3,20 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/server';
+import { getSiteControl } from '../../../lib/site-control';
 
 function text(fd:FormData,key:string){const value=String(fd.get(key)??'').trim();return value||null;}
 function slugify(value:string){return value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');}
 
 async function editor(){
-  const supabase=await createClient();
+  const [supabase,control]=await Promise.all([createClient(),getSiteControl()]);
   const {data:{user}}=await supabase.auth.getUser();
   if(!user) redirect('/login');
-  const {data:roles}=await supabase.from('member_roles').select('role').eq('member_id',user.id);
-  const set=new Set((roles??[]).map(x=>x.role));
-  if(!set.has('superadmin')&&!set.has('admin')&&!set.has('editor')) redirect('/area-socios');
+  if(!control.enabled('testing.full_access')){
+    const {data:roles}=await supabase.from('member_roles').select('role').eq('member_id',user.id);
+    const set=new Set((roles??[]).map(x=>x.role));
+    if(!set.has('superadmin')&&!set.has('admin')&&!set.has('editor')) redirect('/area-socios');
+  }
   return {supabase,user};
 }
 
