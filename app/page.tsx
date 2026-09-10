@@ -10,6 +10,7 @@ export default async function Home(){
   const catalogEnabled=control.enabled('public.catalog')&&!maintenance;
   const registrationEnabled=control.enabled('auth.registration')&&!maintenance;
   const freeMemberArea=control.enabled('testing.member_area_open')&&!maintenance;
+  const fullTestAccess=control.enabled('testing.full_access');
 
   let locations=await (catalogEnabled?getPublishedLocations():Promise.resolve([]));
   let mapLocations:any[]=[];
@@ -42,15 +43,17 @@ export default async function Home(){
   const {data:{user}}=await supabase.auth.getUser();
   let isSuperadmin=false;
   if(user){const {data:roles}=await supabase.from('member_roles').select('role').eq('member_id',user.id);isSuperadmin=(roles??[]).some(item=>item.role==='superadmin');}
+  const canConfigure=fullTestAccess||isSuperadmin;
 
   return <main className="wrap">
     <div className="top-actions">
+      {canConfigure&&<Link className="button-link" href="/admin/sistema">⚙ Configuración y ajustes</Link>}
       {catalogEnabled&&<Link className="button-link secondary" href="/patrimonio">Explorar patrimonio</Link>}
       {registrationEnabled&&<Link className="button-link secondary" href="/registro">Solicitar alta</Link>}
       <Link className="button-link" href={user||freeMemberArea?'/area-socios':'/login'}>{user?'Mi cuenta':freeMemberArea?'Área de socios · pruebas':'Área de socios'}</Link>
-      {isSuperadmin&&<Link className="button-link" href="/admin/sistema">⚙ Ajustes y configuración</Link>}
     </div>
-    {freeMemberArea&&!user&&<p className="notice">Acceso temporal de pruebas al área de socios activado. Los datos privados siguen protegidos.</p>}
+    {fullTestAccess&&<p className="notice">Modo beta total activo. El acceso a Configuración y ajustes está visible en la página principal para preparar la aplicación.</p>}
+    {freeMemberArea&&!user&&<p className="notice">Acceso temporal de pruebas al área de socios activado.</p>}
     <section className="hero">
       <div className="muted">{control.setting('site.name','AAE-AAR')}</div>
       <h1>{maintenance?'Portal en mantenimiento':'El románico, sobre el mapa'}</h1>
