@@ -3,6 +3,7 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { createClient } from '../../lib/supabase/server';
+import { getSiteControl } from '../../lib/site-control';
 
 function value(formData: FormData, key: string) {
   return String(formData.get(key) ?? '').trim();
@@ -10,6 +11,11 @@ function value(formData: FormData, key: string) {
 
 function withMessage(path: string, message: string) {
   return `${path}?mensaje=${encodeURIComponent(message)}`;
+}
+
+function passwordMinimum(control: Awaited<ReturnType<typeof getSiteControl>>) {
+  const parsed = Number(control.setting('auth.password_min_length', '8'));
+  return Number.isInteger(parsed) && parsed >= 8 && parsed <= 128 ? parsed : 8;
 }
 
 export async function login(formData: FormData) {
@@ -23,7 +29,7 @@ export async function login(formData: FormData) {
 }
 
 export async function register(formData: FormData) {
-  const supabase = await createClient();
+  const [supabase, control] = await Promise.all([createClient(), getSiteControl()]);
   const { data: flags } = await supabase.from('feature_flags').select('key,enabled').in('key', ['auth.registration','system.maintenance']);
   const flagMap = new Map((flags ?? []).map((item) => [item.key, item.enabled]));
   if (flagMap.get('auth.registration') === false || flagMap.get('system.maintenance') === true) {
@@ -35,9 +41,10 @@ export async function register(formData: FormData) {
   const email = value(formData, 'email');
   const password = value(formData, 'password');
   const confirmPassword = value(formData, 'confirm_password');
+  const minLength = passwordMinimum(control);
 
-  if (!firstName || !lastName || !email || password.length < 8) {
-    redirect(withMessage('/registro', 'Completa todos los campos y usa una contraseña de al menos 8 caracteres.'));
+  if (!firstName || !lastName || !email || password.length < minLength) {
+    redirect(withMessage('/registro', `Completa todos los campos y usa una contraseña de al menos ${minLength} caracteres.`));
   }
   if (password !== confirmPassword) redirect(withMessage('/registro', 'Las contraseñas no coinciden.'));
 
@@ -72,12 +79,13 @@ export async function requestPasswordReset(formData: FormData) {
 }
 
 export async function updatePassword(formData: FormData) {
+  const [supabase, control] = await Promise.all([createClient(), getSiteControl()]);
   const password = value(formData, 'password');
   const confirmPassword = value(formData, 'confirm_password');
-  if (password.length < 8 || password !== confirmPassword) {
-    redirect(withMessage('/actualizar-clave', 'Las contraseñas deben coincidir y tener al menos 8 caracteres.'));
+  const minLength = passwordMinimum(control);
+  if (password.length < minLength || password !== confirmPassword) {
+    redirect(withMessage('/actualizar-clave', `Las contraseñas deben coincidir y tener al menos ${minLength} caracteres.`));
   }
-  const supabase = await createClient();
   const { error } = await supabase.auth.updateUser({ password });
   if (error) redirect(withMessage('/actualizar-clave', error.message));
   redirect(withMessage('/area-socios', 'Contraseña actualizada.'));
