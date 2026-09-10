@@ -5,7 +5,6 @@ import { getSiteControl } from '../../../lib/site-control';
 import { setFeatureFlag, setSiteSetting } from './actions';
 
 type Setting = { key:string; value:unknown; label:string; description:string|null; is_public:boolean; updated_at:string };
-
 type Flag = { key:string; label:string; description:string|null; enabled:boolean; updated_at:string };
 
 const groups = [
@@ -51,7 +50,7 @@ export default async function SystemControlPage({ searchParams }: { searchParams
   const { mensaje } = await searchParams;
 
   return <>
-    <header className="page-heading"><div><div className="muted">AAE-AAR · Centro de control</div><h1>Configuración y ajustes</h1><p>Parámetros generales, accesos, roles, permisos, apariencia, mapa, mantenimiento y auditoría.</p></div><Link className="button-link secondary" href="/">← Página principal</Link></header>
+    <header className="page-heading"><div><div className="muted">AAE-AAR · Centro de control</div><h1>Configuración y ajustes</h1><p>Parámetros generales, accesos, roles, permisos, apariencia, mapa, mantenimiento y administración funcional.</p></div><Link className="button-link secondary" href="/">← Página principal</Link></header>
     {fullTestAccess && <p className="notice"><strong>Modo beta total activo.</strong> Los controles están abiertos para pruebas. Antes de producción se restaurarán autenticación, roles y políticas estrictas.</p>}
     {mensaje && <p className="notice">{mensaje}</p>}
 
@@ -63,7 +62,12 @@ export default async function SystemControlPage({ searchParams }: { searchParams
     </section>
 
     <section className="system-quick-grid">
-      <Link className="admin-member-card system-quick-card" href="/admin/socios"><div className="catalog-card-meta">Usuarios y roles</div><h2>Socios, roles y permisos</h2><p>Altas, estados, números de socio y asignación de roles.</p><strong>Abrir gestión →</strong></Link>
+      <Link className="admin-member-card system-quick-card" href="/admin/socios"><div className="catalog-card-meta">Socios</div><h2>Fichas, altas y roles</h2><p>Alta, baja, modificación, estado, privacidad, permisos y roles de cada socio.</p><strong>Abrir gestión →</strong></Link>
+      <Link className="admin-member-card system-quick-card" href="/admin/aportaciones"><div className="catalog-card-meta">Aportaciones</div><h2>Propuestas de socios</h2><p>Listado, ficha individual, revisión, archivos y publicación en el patrimonio.</p><strong>Abrir gestión →</strong></Link>
+      <Link className="admin-member-card system-quick-card" href="/admin/eventos"><div className="catalog-card-meta">Eventos</div><h2>Eventos e inscripciones</h2><p>Ficha de cada evento, aforo, asistentes y estados de participación.</p><strong>Abrir gestión →</strong></Link>
+      <Link className="admin-member-card system-quick-card" href="/admin/comunicaciones"><div className="catalog-card-meta">Mensajes</div><h2>Comunicaciones</h2><p>Comunicados, fichas de hilos, participantes, lecturas y contenido.</p><strong>Abrir gestión →</strong></Link>
+      <Link className="admin-member-card system-quick-card" href="/admin/contenidos"><div className="catalog-card-meta">Patrimonio</div><h2>Contenidos y catálogo</h2><p>Localidades, monumentos, noticias, eventos y material editorial.</p><strong>Abrir CMS →</strong></Link>
+      <Link className="admin-member-card system-quick-card" href="/admin/rutas"><div className="catalog-card-meta">Rutas</div><h2>Rutas patrimoniales</h2><p>Creación, modificación, paradas, orden y publicación de rutas.</p><strong>Abrir gestión →</strong></Link>
       <Link className="admin-member-card system-quick-card" href="/actualizar-clave"><div className="catalog-card-meta">Contraseña</div><h2>Cambiar mi contraseña</h2><p>Actualiza la contraseña de la cuenta autenticada.</p><strong>Abrir →</strong></Link>
       <Link className="admin-member-card system-quick-card" href="/recuperar-clave"><div className="catalog-card-meta">Recuperación</div><h2>Restablecer acceso</h2><p>Envía el flujo seguro de recuperación por correo.</p><strong>Abrir →</strong></Link>
       <a className="admin-member-card system-quick-card" href="https://supabase.com/dashboard/project/whyegusyggdjbiyvjwhg/auth/providers" target="_blank" rel="noreferrer"><div className="catalog-card-meta">Proveedor de identidad</div><h2>Supabase Auth</h2><p>Proveedores, acceso anónimo y opciones avanzadas de autenticación.</p><strong>Abrir Supabase →</strong></a>
