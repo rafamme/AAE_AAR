@@ -16,20 +16,40 @@ async function currentRoles() {
   return { supabase, user, roles: new Set((roles ?? []).map((item) => item.role)) };
 }
 
+function memberReturn(formData: FormData, memberId: string, message: string) {
+  const requested = String(formData.get('return_to') || '').trim();
+  const base = requested.startsWith('/admin/socios') ? requested : `/admin/socios/${memberId}`;
+  return `${base}${base.includes('?') ? '&' : '?'}mensaje=${encodeURIComponent(message)}`;
+}
+
 export async function updateMember(formData: FormData) {
   const { supabase, roles } = await currentRoles();
   if (!roles.has('admin') && !roles.has('superadmin')) redirect('/admin');
   const id = String(formData.get('id') || '');
   const status = String(formData.get('status') || 'pending');
-  if (!['pending','active','suspended','inactive'].includes(status)) redirect('/admin/socios?mensaje=Estado%20no%20válido.');
+  if (!['pending','active','suspended','inactive'].includes(status)) redirect(memberReturn(formData,id,'Estado no válido.'));
   const numberRaw = String(formData.get('member_number') || '').trim();
   const joinedRaw = String(formData.get('joined_at') || '').trim();
   const member_number = numberRaw ? Number(numberRaw) : null;
-  if (numberRaw && (!Number.isInteger(member_number) || Number(member_number) < 1)) redirect('/admin/socios?mensaje=Número%20de%20socio%20no%20válido.');
-  const joined_at = joinedRaw || null;
-  const { error } = await supabase.from('members').update({ status, member_number, joined_at }).eq('id', id);
-  revalidatePath('/admin'); revalidatePath('/admin/socios');
-  redirect(`/admin/socios?mensaje=${encodeURIComponent(error ? error.message : 'Socio actualizado.')}`);
+  if (numberRaw && (!Number.isInteger(member_number) || Number(member_number) < 1)) redirect(memberReturn(formData,id,'Número de socio no válido.'));
+  const payload: Record<string, unknown> = {
+    status,
+    member_number,
+    joined_at: joinedRaw || null,
+    updated_at: new Date().toISOString(),
+  };
+  const editableFields = ['first_name','last_name','email_public','phone','address','postal_code','city','region','country','bio'];
+  for (const field of editableFields) {
+    if (formData.has(field)) payload[field] = String(formData.get(field) || '').trim() || null;
+  }
+  if (formData.has('first_name') && !payload.first_name) redirect(memberReturn(formData,id,'El nombre es obligatorio.'));
+  if (formData.has('last_name') && !payload.last_name) redirect(memberReturn(formData,id,'Los apellidos son obligatorios.'));
+  for (const field of ['directory_visible','email_visible','phone_visible']) {
+    if (formData.has(`manage_${field}`)) payload[field] = formData.get(field) === 'on';
+  }
+  const { error } = await supabase.from('members').update(payload).eq('id', id);
+  revalidatePath('/admin'); revalidatePath('/admin/socios'); revalidatePath(`/admin/socios/${id}`); revalidatePath('/area-socios/directorio');
+  redirect(memberReturn(formData,id,error ? error.message : 'Ficha de socio actualizada.'));
 }
 
 export async function approveMember(formData: FormData) {
@@ -37,17 +57,17 @@ export async function approveMember(formData: FormData) {
   if (!roles.has('admin') && !roles.has('superadmin')) redirect('/admin');
   const id = String(formData.get('id') || '');
   const { data: member, error: memberError } = await supabase.from('members').select('id,status,member_number').eq('id', id).single();
-  if (memberError || !member) redirect(`/admin/socios?mensaje=${encodeURIComponent(memberError?.message || 'Socio no encontrado.')}`);
+  if (memberError || !member) redirect(memberReturn(formData,id,memberError?.message || 'Socio no encontrado.'));
   let memberNumber = member.member_number;
   if (!memberNumber) {
     const { data, error } = await supabase.rpc('assign_member_number', { target_member_id: id });
-    if (error) redirect(`/admin/socios?mensaje=${encodeURIComponent(error.message)}`);
+    if (error) redirect(memberReturn(formData,id,error.message));
     memberNumber = data;
   }
   const { error } = await supabase.from('members').update({ status: 'active', joined_at: new Date().toISOString().slice(0,10) }).eq('id', id);
   if (!error) await supabase.from('member_roles').upsert({ member_id: id, role: 'member' });
-  revalidatePath('/admin'); revalidatePath('/admin/socios'); revalidatePath('/area-socios');
-  redirect(`/admin/socios?mensaje=${encodeURIComponent(error ? error.message : `Alta aprobada. Socio nº ${memberNumber}.`)}`);
+  revalidatePath('/admin'); revalidatePath('/admin/socios'); revalidatePath(`/admin/socios/${id}`); revalidatePath('/area-socios');
+  redirect(memberReturn(formData,id,error ? error.message : `Alta aprobada. Socio nº ${memberNumber}.`));
 }
 
 export async function rejectMember(formData: FormData) {
@@ -55,8 +75,8 @@ export async function rejectMember(formData: FormData) {
   if (!roles.has('admin') && !roles.has('superadmin')) redirect('/admin');
   const id = String(formData.get('id') || '');
   const { error } = await supabase.from('members').update({ status: 'inactive', joined_at: null }).eq('id', id).eq('status', 'pending');
-  revalidatePath('/admin'); revalidatePath('/admin/socios');
-  redirect(`/admin/socios?mensaje=${encodeURIComponent(error ? error.message : 'Solicitud rechazada.')}`);
+  revalidatePath('/admin'); revalidatePath('/admin/socios'); revalidatePath(`/admin/socios/${id}`);
+  redirect(memberReturn(formData,id,error ? error.message : 'Solicitud rechazada y dada de baja.'));
 }
 
 export async function setMemberRole(formData: FormData) {
@@ -66,15 +86,15 @@ export async function setMemberRole(formData: FormData) {
   const memberId = String(formData.get('member_id') || '');
   const role = String(formData.get('role') || '');
   const enabled = String(formData.get('enabled') || '') === 'true';
-  if (!['superadmin', 'admin', 'editor', 'member'].includes(role)) redirect('/admin/socios?mensaje=Rol%20no%20válido.');
-  if (role === 'superadmin' && !isSuperadmin) redirect('/admin/socios?mensaje=Solo%20un%20superadministrador%20puede%20gestionar%20ese%20rol.');
-  if (!enabled && memberId === user.id && role === 'admin' && !isSuperadmin) redirect('/admin/socios?mensaje=No%20puedes%20retirarte%20tu%20propio%20rol%20de%20administrador.');
+  if (!['superadmin', 'admin', 'editor', 'member'].includes(role)) redirect(memberReturn(formData,memberId,'Rol no válido.'));
+  if (role === 'superadmin' && !isSuperadmin) redirect(memberReturn(formData,memberId,'Solo un superadministrador puede gestionar ese rol.'));
+  if (!enabled && memberId === user.id && role === 'admin' && !isSuperadmin) redirect(memberReturn(formData,memberId,'No puedes retirarte tu propio rol de administrador.'));
   const query = enabled
     ? supabase.from('member_roles').upsert({ member_id: memberId, role })
     : supabase.from('member_roles').delete().eq('member_id', memberId).eq('role', role);
   const { error } = await query;
-  revalidatePath('/admin/socios'); revalidatePath('/admin/sistema');
-  redirect(`/admin/socios?mensaje=${encodeURIComponent(error ? error.message : 'Roles actualizados.')}`);
+  revalidatePath('/admin/socios'); revalidatePath(`/admin/socios/${memberId}`); revalidatePath('/admin/sistema');
+  redirect(memberReturn(formData,memberId,error ? error.message : 'Roles y permisos actualizados.'));
 }
 
 export async function updateEventRegistrationStatus(formData: FormData) {
